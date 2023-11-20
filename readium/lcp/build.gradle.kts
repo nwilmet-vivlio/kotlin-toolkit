@@ -42,6 +42,19 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-lcp"
 apply(from = "$rootDir/scripts/publish-module.gradle")
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components.getByName("release"))
+                groupId = "com.github.readium"
+                artifactId = "readium-lcp"
+//                artifact(tasks.findByName("sourcesJar"))
+//                artifact(tasks.findByName("javadocsJar"))
+            }
+        }
+    }
+}
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)

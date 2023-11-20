@@ -12,11 +12,13 @@ plugins {
 }
 
 android {
-    // FIXME: This doesn't pass the lint because some resources don't start with readium_ yet. We need to rename all resources for the next major version.
-//    resourcePrefix "readium_"
+    // FIXME: This doesn't pass the lint because some resources don't start with r2_ yet. We need to rename all resources for the next major version.
+//    resourcePrefix "r2_"
 
     compileSdk = 33
-
+    kotlinOptions{
+        freeCompilerArgs += "-Xjvm-default=all"
+    }
     defaultConfig {
         minSdk = 21
         targetSdk = 33
@@ -50,6 +52,19 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-navigator"
 apply(from = "$rootDir/scripts/publish-module.gradle")
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components.getByName("release"))
+                groupId = "com.github.readium"
+                artifactId = "readium-navigator"
+//                artifact(tasks.findByName("sourcesJar"))
+//                artifact(tasks.findByName("javadocsJar"))
+            }
+        }
+    }
+}
 
 dependencies {
     api(project(":readium:readium-shared"))
@@ -72,6 +87,13 @@ dependencies {
     implementation(libs.androidx.webkit)
     // Needed to avoid a crash with API 31, see https://stackoverflow.com/a/69152986/1474476
     implementation("androidx.work:work-runtime-ktx:2.7.1")
+    implementation("com.duolingo.open:rtl-viewpager:1.0.3")
+
+    api(project(":android-pdf-viewer"))
+    api(project(":pdfium"))
+
+    // ChrisBane/PhotoView ( for the Zoom handling )
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
 
     implementation(libs.bundles.media2)
     // ExoPlayer is used by the Audio Navigator.

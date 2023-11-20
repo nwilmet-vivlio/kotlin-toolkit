@@ -42,6 +42,7 @@ export function getCurrentSelection() {
     return null;
   }
   const rect = getSelectionRect();
+  Android.onSelection(JSON.stringify({ text, rect }));
   return { text, rect };
 }
 
@@ -69,25 +70,14 @@ function getCurrentSelectionText() {
     return undefined;
   }
   const highlight = selection.toString();
-  const cleanHighlight = highlight
-    .trim()
-    .replace(/\n/g, " ")
-    .replace(/\s\s+/g, " ");
+  const cleanHighlight = highlight.trim().replace(/\n/g, " ").replace(/\s\s+/g, " ");
   if (cleanHighlight.length === 0) {
     return undefined;
   }
   if (!selection.anchorNode || !selection.focusNode) {
     return undefined;
   }
-  const range =
-    selection.rangeCount === 1
-      ? selection.getRangeAt(0)
-      : createOrderedRange(
-          selection.anchorNode,
-          selection.anchorOffset,
-          selection.focusNode,
-          selection.focusOffset
-        );
+  const range = selection.rangeCount === 1 ? selection.getRangeAt(0) : createOrderedRange(selection.anchorNode, selection.anchorOffset, selection.focusNode, selection.focusOffset);
   if (!range || range.collapsed) {
     log("$$$$$$$$$$$$$$$$$ CANNOT GET NON-COLLAPSED SELECTION RANGE?!");
     return undefined;
@@ -137,61 +127,41 @@ function createOrderedRange(startNode, startOffset, endNode, endOffset) {
 }
 
 export function convertRangeInfo(document, rangeInfo) {
-  const startElement = document.querySelector(
-    rangeInfo.startContainerElementCssSelector
-  );
+  const startElement = document.querySelector(rangeInfo.startContainerElementCssSelector);
   if (!startElement) {
     log("^^^ convertRangeInfo NO START ELEMENT CSS SELECTOR?!");
     return undefined;
   }
   let startContainer = startElement;
   if (rangeInfo.startContainerChildTextNodeIndex >= 0) {
-    if (
-      rangeInfo.startContainerChildTextNodeIndex >=
-      startElement.childNodes.length
-    ) {
-      log(
-        "^^^ convertRangeInfo rangeInfo.startContainerChildTextNodeIndex >= startElement.childNodes.length?!"
-      );
+    if (rangeInfo.startContainerChildTextNodeIndex >= startElement.childNodes.length) {
+      log("^^^ convertRangeInfo rangeInfo.startContainerChildTextNodeIndex >= startElement.childNodes.length?!");
       return undefined;
     }
-    startContainer =
-      startElement.childNodes[rangeInfo.startContainerChildTextNodeIndex];
+    startContainer = startElement.childNodes[rangeInfo.startContainerChildTextNodeIndex];
     if (startContainer.nodeType !== Node.TEXT_NODE) {
       log("^^^ convertRangeInfo startContainer.nodeType !== Node.TEXT_NODE?!");
       return undefined;
     }
   }
-  const endElement = document.querySelector(
-    rangeInfo.endContainerElementCssSelector
-  );
+  const endElement = document.querySelector(rangeInfo.endContainerElementCssSelector);
   if (!endElement) {
     log("^^^ convertRangeInfo NO END ELEMENT CSS SELECTOR?!");
     return undefined;
   }
   let endContainer = endElement;
   if (rangeInfo.endContainerChildTextNodeIndex >= 0) {
-    if (
-      rangeInfo.endContainerChildTextNodeIndex >= endElement.childNodes.length
-    ) {
-      log(
-        "^^^ convertRangeInfo rangeInfo.endContainerChildTextNodeIndex >= endElement.childNodes.length?!"
-      );
+    if (rangeInfo.endContainerChildTextNodeIndex >= endElement.childNodes.length) {
+      log("^^^ convertRangeInfo rangeInfo.endContainerChildTextNodeIndex >= endElement.childNodes.length?!");
       return undefined;
     }
-    endContainer =
-      endElement.childNodes[rangeInfo.endContainerChildTextNodeIndex];
+    endContainer = endElement.childNodes[rangeInfo.endContainerChildTextNodeIndex];
     if (endContainer.nodeType !== Node.TEXT_NODE) {
       log("^^^ convertRangeInfo endContainer.nodeType !== Node.TEXT_NODE?!");
       return undefined;
     }
   }
-  return createOrderedRange(
-    startContainer,
-    rangeInfo.startOffset,
-    endContainer,
-    rangeInfo.endOffset
-  );
+  return createOrderedRange(startContainer, rangeInfo.startOffset, endContainer, rangeInfo.endOffset);
 }
 
 export function location2RangeInfo(location) {

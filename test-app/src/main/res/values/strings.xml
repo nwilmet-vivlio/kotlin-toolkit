@@ -78,8 +78,8 @@
     <string name="usersettings_appearance_sepia">Sepia</string>
     <string name="usersettings_appearance_night">Night</string>
     <string name="usersettings_label_scroll_mode">Scroll mode</string>
-    <string name="usersettings_publisher_default">"Publisher's Default"</string>
-    <string name="usersettings_publisher_default_accessibility">"Publisher's Default Settings"</string>
+    <string name="usersettings_publisher_default">"Publisher\'s Default"</string>
+    <string name="usersettings_publisher_default_accessibility">"Publisher\'s Default Settings"</string>
     <string name="usersettings_label_columns">Columns</string>
     <string name="usersettings_auto">Auto</string>
     <string name="usersettings_column_one">1</string>

@@ -9,6 +9,7 @@ package org.readium.r2.navigator.media
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
@@ -55,6 +56,9 @@ class ExoMediaPlayer(
 
     override var listener: MediaPlayer.Listener? = null
 
+    //Exposing context for inner classes (PlayerListener)
+    private val playerContext: Context = context
+
     private val publication: Publication = media.publication
     private val publicationId: PublicationId = media.publicationId
 
@@ -73,9 +77,9 @@ class ExoMediaPlayer(
         factory
     }
 
-    private val player: ExoPlayer = ExoPlayer.Builder(context)
-        .setSeekBackIncrementMs(30.seconds.inWholeMilliseconds)
-        .setSeekForwardIncrementMs(30.seconds.inWholeMilliseconds)
+    private val player: ExoPlayer = SimpleExoPlayer.Builder(context)
+        .setSeekBackIncrementMs(Duration.seconds(10).inWholeMilliseconds)
+        .setSeekForwardIncrementMs(Duration.seconds(30).inWholeMilliseconds)
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
         .setAudioAttributes(
             AudioAttributes.Builder()
@@ -99,29 +103,73 @@ class ExoMediaPlayer(
             player.playbackParameters = PlaybackParameters(speed.toFloat(), pitch)
         }
 
+    var forwardingPlayer: ForwardingPlayer = object : ForwardingPlayer(player) {
+      //Here we want to redirect events to the react-native-readium-toolkit lib, to emit the event to RN
+      override fun pause() {
+        val intent = Intent()
+        intent.action = "com.vivlio.mobile.reader.audio.NOTIFICATION_PAUSE"
+        context.sendBroadcast(intent)
+        super.pause()
+      }
+      override fun play() {
+        val intent = Intent()
+        intent.action = "com.vivlio.mobile.reader.audio.NOTIFICATION_PLAY"
+        context.sendBroadcast(intent)
+        super.play()
+      }
+      override fun seekForward() {
+        val intent = Intent()
+        intent.action = "com.vivlio.mobile.reader.audio.NOTIFICATION_FORWARD"
+        context.sendBroadcast(intent)
+        super.seekForward()
+      }
+      override fun seekBack() {
+        val intent = Intent()
+        intent.action = "com.vivlio.mobile.reader.audio.NOTIFICATION_BACKWARD"
+        context.sendBroadcast(intent)
+        super.seekBack()
+      }
+      override fun seekToNext() {
+        val intent = Intent()
+        intent.action = "com.vivlio.mobile.reader.audio.NOTIFICATION_NEXT"
+        context.sendBroadcast(intent)
+        super.seekToNext()
+      }
+      override fun seekToPrevious() {
+        val intent = Intent()
+        intent.action = "com.vivlio.mobile.reader.audio.NOTIFICATION_PREVIOUS"
+        context.sendBroadcast(intent)
+        super.seekToPrevious()
+      }
+    }
+
     private val notificationManager =
         PlayerNotificationManager.Builder(
             context,
             MEDIA_NOTIFICATION_ID,
             MEDIA_CHANNEL_ID
         )
-            .setChannelNameResourceId(R.string.r2_media_notification_channel_name)
-            .setChannelDescriptionResourceId(R.string.r2_media_notification_channel_description)
-            .setMediaDescriptionAdapter(DescriptionAdapter(mediaSession.controller, media))
-            .setNotificationListener(NotificationListener())
-            .setRewindActionIconResourceId(R.drawable.r2_media_notification_rewind)
-            .setFastForwardActionIconResourceId(R.drawable.r2_media_notification_fastforward)
-            .build()
-            .apply {
-                setMediaSessionToken(mediaSession.sessionToken)
-                setPlayer(player)
-                setSmallIcon(com.google.android.exoplayer2.ui.R.drawable.exo_notification_small_icon)
-                setUsePlayPauseActions(true)
-                setUseStopAction(false)
-                setUseChronometer(false)
-                setUseRewindAction(true)
-                setUseRewindActionInCompactView(true)
-            }
+        .setChannelNameResourceId(R.string.r2_media_notification_channel_name)
+        .setChannelDescriptionResourceId(R.string.r2_media_notification_channel_description)
+        .setMediaDescriptionAdapter(DescriptionAdapter(mediaSession.controller, media))
+        .setNotificationListener(NotificationListener())
+        .setPlayActionIconResourceId(R.drawable.vivlio_media_notification_play)
+        .setPauseActionIconResourceId(R.drawable.vivlio_media_notification_pause)
+        .setRewindActionIconResourceId(R.drawable.vivlio_media_notification_rewind_10)
+        .setFastForwardActionIconResourceId(R.drawable.vivlio_media_notification_fastforward_30)
+        .build()
+        .apply {
+            setMediaSessionToken(mediaSession.sessionToken)
+            setPlayer(forwardingPlayer)
+            setSmallIcon(R.drawable.vivlio_ic_notification)
+            setUsePlayPauseActions(true)
+            setUseStopAction(false)
+            setUseChronometer(false)
+            setUseRewindAction(true)
+            setUseRewindActionInCompactView(true)
+            setUseFastForwardAction(true)
+            setUseFastForwardActionInCompactView(true)
+        }
 
     private val mediaSessionConnector = MediaSessionConnector(mediaSession)
 
@@ -176,6 +224,29 @@ class ExoMediaPlayer(
             if (playbackState == Player.STATE_IDLE) {
                 listener?.onPlayerStopped()
             }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            //List of MediaItemTransitionReason available here : https://exoplayer.dev/doc/reference/com/google/android/exoplayer2/Player.MediaItemTransitionReason.html
+            var eventToSend: String
+            when (reason) {
+                0 -> eventToSend = "com.vivlio.mobile.reader.audio.PLAYER_MEDIA_TRANSITION_REPEAT"
+                1 -> eventToSend = "com.vivlio.mobile.reader.audio.PLAYER_MEDIA_TRANSITION_AUTO"
+                2 -> eventToSend = "com.vivlio.mobile.reader.audio.PLAYER_MEDIA_TRANSITION_SEEK"
+                3 -> eventToSend = "com.vivlio.mobile.reader.audio.PLAYER_MEDIA_TRANSITION_PLAYLIST_CHANGED"
+                else -> {
+                    eventToSend = "com.vivlio.mobile.reader.audio.PLAYER_MEDIA_TRANSITION_REPEAT"
+                }
+            }
+            val currentMediaItem = player.currentMediaItemIndex
+            val intent = Intent()
+            intent.action = eventToSend
+            if(currentMediaItem != null) {
+              intent.putExtra("mediaItemId", currentMediaItem)
+            }
+            //Context needed to send the broadcast
+            this@ExoMediaPlayer.playerContext.sendBroadcast(intent)
+            super.onMediaItemTransition(mediaItem, reason)
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -257,10 +328,10 @@ class ExoMediaPlayer(
             controller.sessionActivity
 
         override fun getCurrentContentText(player: Player): CharSequence =
-            publication.metadata.title
+          controller.metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION) ?: publication.metadata.title
 
         override fun getCurrentContentTitle(player: Player): CharSequence =
-            controller.metadata.description.title ?: publication.metadata.title
+            controller.metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE) ?: publication.metadata.title
 
         override fun getCurrentLargeIcon(
             player: Player,

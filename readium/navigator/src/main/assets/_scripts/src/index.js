@@ -8,11 +8,13 @@
 
 import "./gestures";
 import {
+  getExtraLocationInfos,
   removeProperty,
   scrollLeft,
   scrollRight,
   scrollToEnd,
   scrollToId,
+  scrollToPartialCfi,
   scrollToPosition,
   scrollToStart,
   scrollToText,
@@ -45,6 +47,10 @@ window.readium = {
   setCSSProperties: setCSSProperties,
   setProperty: setProperty,
   removeProperty: removeProperty,
+
+  // vivlio
+  getExtraLocationInfos: getExtraLocationInfos,
+  scrollToPartialCfi: scrollToPartialCfi,
 
   // selection
   getCurrentSelection: getCurrentSelection,

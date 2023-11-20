@@ -43,6 +43,19 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-shared"
 apply(from = "$rootDir/scripts/publish-module.gradle")
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components.getByName("release"))
+                groupId = "com.github.readium"
+                artifactId = "readium-shared"
+//                artifact(tasks.findByName("sourcesJar"))
+//                artifact(tasks.findByName("javadocsJar"))
+            }
+        }
+    }
+}
 
 dependencies {
     implementation(libs.androidx.appcompat)

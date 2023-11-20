@@ -177,10 +177,6 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
         }
     }
 
-    override fun toggleActionBar(v: View?) {
-        toggleActionBar()
-    }
-
     override fun onTap(point: PointF): Boolean {
         val viewWidth = navigatorFragment.requireView().width
         val leftRange = 0.0..(0.2 * viewWidth)

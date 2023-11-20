@@ -73,11 +73,20 @@ import org.readium.r2.shared.publication.services.isRestricted
 import org.readium.r2.shared.publication.services.positionsByReadingOrder
 import org.readium.r2.shared.util.launchWebBrowser
 import org.readium.r2.shared.util.mediatype.MediaType
+import kotlin.math.ceil
+import kotlin.reflect.KClass
 
 /**
  * Factory for a [JavascriptInterface] which will be injected in the web views.
  *
  * Return `null` if you don't want to inject the interface for the given resource.
+ */
+typealias JavascriptInterfaceFactory = (resource: Link) -> Any?
+
+/**
+ * Factory for a [JavascriptInterface] which will be injected in the web views.
+ *
+ * Return `null` if you don't want to inject the interface for the given [resource].
  */
 typealias JavascriptInterfaceFactory = (resource: Link) -> Any?
 
@@ -164,7 +173,7 @@ class EpubNavigatorFragment internal constructor(
         /**
          * Whether padding accounting for display cutouts should be applied.
          */
-        var shouldApplyInsetsPadding: Boolean?,
+        var shouldApplyInsetsPadding: Boolean? = true,
 
         /**
          * Disable user selection if the publication is protected by a DRM (e.g. with LCP).
@@ -175,7 +184,7 @@ class EpubNavigatorFragment internal constructor(
          * https://github.com/readium/kotlin-toolkit/issues/299#issuecomment-1315643577
          */
         @DelicateReadiumApi
-        var disableSelectionWhenProtected: Boolean,
+        var disableSelectionWhenProtected: Boolean?,
 
         internal var fontFamilyDeclarations: List<FontFamilyDeclaration>,
         internal var javascriptInterfaces: Map<String, JavascriptInterfaceFactory>
@@ -229,6 +238,7 @@ class EpubNavigatorFragment internal constructor(
         companion object {
             operator fun invoke(builder: Configuration.() -> Unit): Configuration =
                 Configuration().apply(builder)
+            javascriptInterfaces[name] = factory
         }
     }
 
@@ -265,6 +275,19 @@ class EpubNavigatorFragment internal constructor(
         return webView.runJavaScriptSuspend(script)
     }
 
+    /**
+     * Evaluates the given JavaScript on the currently visible HTML resource.
+     *
+     * Note that this only work with reflowable resources.
+     */
+    @OptIn(InternalReadiumApi::class)
+    suspend fun evaluateJavascript(script: String): String? {
+        val page = currentReflowablePageFragment ?: return null
+        page.awaitLoaded()
+        val webView = page.webView ?: return null
+        return webView.runJavaScriptSuspend(script)
+    }
+
     private val viewModel: EpubNavigatorViewModel by viewModels {
         EpubNavigatorViewModel.createFactory(
             requireActivity().application, publication,
@@ -287,6 +310,7 @@ class EpubNavigatorFragment internal constructor(
 
     private lateinit var resourcesSingle: List<PageResource>
     private lateinit var resourcesDouble: List<PageResource>
+    private var doublePage: Boolean = false
 
     @Deprecated("Migrate to the new Settings API (see migration guide)")
     val preferences: SharedPreferences get() = viewModel.preferences
@@ -359,7 +383,31 @@ class EpubNavigatorFragment internal constructor(
                             doublePageLeft = null
                         }
                     }
+
+                // TODO: Check if code needed
+
+                // var doublePageLeft = ""
+                // var doublePageRight = ""
+
+                // for ((index, link) in publication.readingOrder.withIndex()) {
+                //     val url = link.withBaseUrl(baseUrl).href
+                //     resourcesSingle.add(PageResource.EpubFxl(url))
+                //     val position = link.properties.otherProperties.get("page")
+                //     if (position != null && position == "right") {
+                //       doublePageRight = url
+                //       if (!doublePage) doublePage = true
+                //     }
+                //     else if (position != null && position == "left") {
+                //       doublePageLeft = url
+                //       if (!doublePage) doublePage = true
+                //     }
+                //     if (doublePageRight != "") {
+                //       resourcesDouble.add(PageResource.EpubFxl(doublePageLeft, doublePageRight))
+                //       doublePageLeft = ""
+                //       doublePageRight = ""
+
                 }
+
                 // add last page if there is only a left page remaining
                 if (doublePageLeft != null) {
                     resourcesDouble.add(PageResource.EpubFxl(leftLink = doublePageLeft, leftUrl = viewModel.urlTo(doublePageLeft)))
@@ -367,6 +415,27 @@ class EpubNavigatorFragment internal constructor(
 
                 this.resourcesSingle = resourcesSingle
                 this.resourcesDouble = resourcesDouble
+
+                resourcePager.type = Publication.TYPE.FXL
+
+                // TODO: Check if code needed
+                
+                // adapter = when (preferences.getInt(COLUMN_COUNT_REF, 0)) {
+                //     1 -> {
+                //         R2PagerAdapter(childFragmentManager, resourcesSingle)
+                //     }
+                //     2 -> {
+                //         R2PagerAdapter(childFragmentManager, resourcesDouble)
+                //     }
+                //     else -> {
+                //         if (doublePage) {
+                //             R2PagerAdapter(childFragmentManager, resourcesDouble)
+                //         }
+                //         else {
+                //             R2PagerAdapter(childFragmentManager, resourcesSingle)
+                //         }
+                //     }
+                // }
             }
         }
 
@@ -385,7 +454,7 @@ class EpubNavigatorFragment internal constructor(
 //                    resourcePager.disableTouchEvents = true
 //                }
                 currentReflowablePageFragment?.webView?.let { webView ->
-                    if (viewModel.isScrollEnabled.value) {
+                    if (preferences.getBoolean(SCROLL_REF, false)) {
                         if (currentPagerPosition < position) {
                             // handle swipe LEFT
                             webView.scrollToStart()
@@ -576,22 +645,32 @@ class EpubNavigatorFragment internal constructor(
             val (index, _) = page
 
             if (resourcePager.currentItem != index) {
+                if (resource is PageResource.EpubReflowable) {
+                    pendingLocator = locator
+                }
                 resourcePager.currentItem = index
             }
-            r2PagerAdapter?.loadLocatorAt(index, locator)
+
+            currentReflowablePageFragment?.loadLocator(locator)
         }
 
         if (publication.metadata.presentation.layout != EpubLayout.FIXED) {
             setCurrent(resourcesSingle)
         } else {
-
-            when (viewModel.dualPageMode) {
-                // FIXME: Properly implement DualPage.AUTO depending on the device orientation.
-                DualPage.OFF, DualPage.AUTO -> {
+            when (preferences.getInt(COLUMN_COUNT_REF, 0)) {
+                1 -> {
                     setCurrent(resourcesSingle)
                 }
                 DualPage.ON -> {
                     setCurrent(resourcesDouble)
+                }
+                else -> {
+                    if (doublePage) {
+                        setCurrent(resourcesDouble)
+                    }
+                    else {
+                        setCurrent(resourcesSingle)
+                    }
                 }
             }
         }
@@ -710,6 +789,7 @@ class EpubNavigatorFragment internal constructor(
             r2Activity?.onPageEnded(end)
         }
 
+        @InternalReadiumApi
         override fun javascriptInterfacesForResource(link: Link): Map<String, Any?> =
             config.javascriptInterfaces.mapValues { (_, factory) -> factory(link) }
 
@@ -727,9 +807,37 @@ class EpubNavigatorFragment internal constructor(
                     )
             }
         }
+        override fun onTap(point: PointF): Boolean {
+            if (currentSelection != null) {
+                return listener?.onSelection(currentSelection!!) ?: false
+            }
+            else {
+                currentSelection = null
+                return listener?.onTap(point.adjustedToViewport()) ?: false
+            }
+        }
 
-        override fun onTap(point: PointF): Boolean =
-            listener?.onTap(point.adjustedToViewport()) ?: false
+        private var currentSelection: Selection? = null
+        override fun onSelection(eventJson: String): Boolean {
+            val jsonObject = JSONObject(eventJson)
+            val text = Locator.Text.fromJSON(jsonObject.optJSONObject("text"))
+            val rect = jsonObject.optRectF("rect")
+            ?.run { adjustedToViewport() }
+
+            val currentSelection = Selection(
+                locator = currentLocator.value.copy(
+                    text  = text
+                ),
+                rect = rect
+            )
+            return listener?.onSelection(currentSelection) ?: false
+        }
+
+      override fun onFontSizeChange(fontSize: Int): Boolean =
+        listener?.fontSize(fontSize) ?: false
+
+        override fun onScale(zoomLevel: Float): Boolean =
+            listener?.onScale(zoomLevel) ?: false
 
         override fun onDragStart(event: R2BasicWebView.DragEvent): Boolean =
             listener?.onDragStart(
@@ -788,9 +896,23 @@ class EpubNavigatorFragment internal constructor(
         /**
          * Prevents opening external links in the web view and handles internal links.
          */
+        
         override fun shouldOverrideUrlLoading(webView: WebView, request: WebResourceRequest): Boolean {
             val url = request.url ?: return false
             viewModel.navigateToUrl(url)
+
+            val baseUrl = baseUrl.takeIf { it.isNotBlank() }
+                ?: publication.linkWithRel("self")?.href
+                ?: return false
+
+            if (!url.startsWith(baseUrl)) {
+                // [WARN-TODO] Check : request is `WebResourceRequest`, was `Uri` before
+                openExternalLink(request)
+            } else {
+                // Navigate to an internal link
+                go(Link(href = url.removePrefix(baseUrl).addPrefix("/")))
+            }
+
             return true
         }
 
@@ -908,6 +1030,9 @@ class EpubNavigatorFragment internal constructor(
     private fun fragmentAt(index: Int): Fragment? =
         r2PagerAdapter?.mFragments?.get(adapter.getItemId(index))
 
+    private val currentReflowablePageFragment: R2EpubPageFragment? get() =
+        currentFragment as? R2EpubPageFragment
+
     /**
      * Returns the reflowable page fragment matching the given href, if it is already loaded in the
      * view pager.
@@ -966,7 +1091,8 @@ class EpubNavigatorFragment internal constructor(
                 val title = link.title ?: ""
 
                 if (title.isNotEmpty()) {
-                    result[link.href] = title
+                    val href = link.href.split("#")[0]
+                    result[href] = title
                 }
 
                 val subResult = fulfill(link.children)

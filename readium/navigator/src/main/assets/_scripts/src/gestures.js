@@ -5,25 +5,53 @@
  */
 
 import { handleDecorationClickEvent } from "./decorator";
+import { getCurrentSelection } from "./selection";
+
+function debounce(delay, func) {
+  var timeout;
+  return function () {
+    var self = this;
+    var args = arguments;
+    function callback() {
+      func.apply(self, args);
+      timeout = null;
+    }
+    clearTimeout(timeout);
+    timeout = setTimeout(callback, delay);
+  };
+}
 
 window.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("click", onClick, false);
+  document.addEventListener('contextmenu', function(event) {
+    // Prevent the context menu from appearing
+    event.preventDefault();
+  });
+  document.addEventListener(
+    "selectionchange",
+    debounce(50, function () {
+      getCurrentSelection()
+    }),
+    false
+  );
   bindDragGesture(document);
 });
+
 
 function onClick(event) {
   if (!window.getSelection().isCollapsed) {
     // There's an on-going selection, the tap will dismiss it so we don't forward it.
     return;
   }
-
   var pixelRatio = window.devicePixelRatio;
+  const nearest = nearestInteractiveElement(event.target);
   let clickEvent = {
     defaultPrevented: event.defaultPrevented,
-    x: event.clientX * pixelRatio,
-    y: event.clientY * pixelRatio,
+    x: event.screenX * pixelRatio,
+    y: event.screenY * pixelRatio,
     targetElement: event.target.outerHTML,
-    interactiveElement: nearestInteractiveElement(event.target),
+    interactiveElement: nearest?nearest.html:null,
+    href: nearest?nearest.href:null
   };
 
   if (handleDecorationClickEvent(event, clickEvent)) {
@@ -55,6 +83,7 @@ function bindDragGesture(element) {
 
     const startX = event.touches[0].clientX * pixelRatio;
     const startY = event.touches[0].clientY * pixelRatio;
+    const nearest = nearestInteractiveElement(event.target);
     state = {
       defaultPrevented: event.defaultPrevented,
       startX: startX,
@@ -63,7 +92,7 @@ function bindDragGesture(element) {
       currentY: startY,
       offsetX: 0,
       offsetY: 0,
-      interactiveElement: nearestInteractiveElement(event.target),
+      interactiveElement: nearest?nearest.html:null
     };
   }
 
@@ -121,7 +150,12 @@ function nearestInteractiveElement(element) {
     "video",
   ];
   if (interactiveTags.indexOf(element.nodeName.toLowerCase()) != -1) {
-    return element.outerHTML;
+    if (element.nodeName.toLowerCase() == 'a' && element.hasAttribute('href')) {
+      return {
+	html: element.outerHTML,
+	href: new URL(element.getAttribute('href'), document.location.href)
+      }
+    }
   }
 
   // Checks whether the element is editable by the user.
@@ -129,7 +163,10 @@ function nearestInteractiveElement(element) {
     element.hasAttribute("contenteditable") &&
     element.getAttribute("contenteditable").toLowerCase() != "false"
   ) {
-    return element.outerHTML;
+    return {
+      html: element.outerHTML,
+      href: null
+    }
   }
 
   // Checks parents recursively because the touch might be for example on an <em> inside a <a>.

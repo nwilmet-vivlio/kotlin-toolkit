@@ -15,9 +15,12 @@ import android.os.Build
 import android.text.Html
 import android.util.AttributeSet
 import android.view.*
-import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.ScaleGestureDetector
+import android.webkit.URLUtil
 import android.webkit.WebView
 import android.widget.ImageButton
 import android.widget.ListPopupWindow
@@ -31,10 +34,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.json.JSONException
 import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
 import org.readium.r2.navigator.extensions.optRectF
+import org.readium.r2.shared.FONT_SIZE_REF
 import org.readium.r2.shared.InternalReadiumApi
 import org.readium.r2.shared.extensions.optNullableString
 import org.readium.r2.shared.extensions.tryOrLog
@@ -58,6 +63,9 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         fun onPageEnded(end: Boolean)
         fun onScroll()
         fun onTap(point: PointF): Boolean
+        fun onSelection(eventJson: String): Boolean
+        fun onFontSizeChange(fontSize: Int): Boolean
+        fun onScale(zoomLevel: Float): Boolean
         fun onDragStart(event: DragEvent): Boolean
         fun onDragMove(event: DragEvent): Boolean
         fun onDragEnd(event: DragEvent): Boolean
@@ -67,6 +75,9 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         fun onHighlightAnnotationMarkActivated(id: String)
         fun goForward(animated: Boolean = false, completion: () -> Unit = {}): Boolean = false
         fun goBackward(animated: Boolean = false, completion: () -> Unit = {}): Boolean = false
+
+        @InternalReadiumApi
+        fun javascriptInterfacesForResource(link: Link): Map<String, Any?> = emptyMap()
 
         /**
          * Returns the custom [ActionMode.Callback] to be used with the text selection menu.
@@ -92,11 +103,22 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         fun goToNextResource(jump: Boolean, animated: Boolean): Boolean = false
         @InternalReadiumApi
         fun goToPreviousResource(jump: Boolean, animated: Boolean): Boolean = false
+        /**
+         * Offers an opportunity to override a request loaded by the given web view.
+         */
+        fun shouldOverrideUrlLoading(webView: WebView, request: Uri): Boolean = false
     }
 
     var listener: Listener? = null
     internal var preferences: SharedPreferences? = null
     internal var useLegacySettings: Boolean = false
+
+    var startCfi: String? = null
+    var endCfi: String? = null
+
+    var scaleValue = 1.0f
+
+    var overrideUrlLoading = true
 
     var resourceUrl: String? = null
 
@@ -110,6 +132,9 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
     var callback: OnOverScrolledCallback? = null
 
     private val uiScope = CoroutineScope(Dispatchers.Main)
+
+    // Declare a ScaleGestureDetector to handle pinch gestures
+    private var scaleGestureDetector: ScaleGestureDetector? = null
 
     init {
         setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
@@ -157,6 +182,27 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean)
     }
 
+    fun setScaleGestureDetectorForFontSize() {
+        scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (detector != null) {
+                    handlePinchZoom(detector.scaleFactor)
+                }
+                return true
+            }
+        })
+    }
+
+    fun setScaleGestureDetectorForScale() {
+        scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+
+            override fun onScaleEnd(detector: ScaleGestureDetector) {
+                this@R2BasicWebView.listener.onScale(this@R2BasicWebView.scaleValue)
+            }
+        })
+    }
+
     fun setOnOverScrolledCallback(callback: OnOverScrolledCallback) {
         this.callback = callback
     }
@@ -179,6 +225,17 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         removeJavascriptInterface("Android")
 
         super.destroy()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (oldw != 0 && oldw != w) {
+            val dpRatio = context!!.resources.displayMetrics.density
+            this.evaluateJavascript("setLayout(${w/(2*dpRatio)},${h/dpRatio});refreshPages();",
+              {})
+            this.evaluateJavascript("if(!window.onSizeChanged) window.onSizeChanged = new Event('onSizeChanged');", {})
+            this.evaluateJavascript("window.dispatchEvent(window.onSizeChanged);", {})
+        }
     }
 
     @android.webkit.JavascriptInterface
@@ -274,7 +331,7 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         // We ignore taps on interactive element, unless it's an element we handle ourselves such as
         // pop-up footnotes.
         if (event.interactiveElement != null) {
-            return handleFootnote(event.targetElement)
+            return handleFootnote(event.targetElement) || handleLink(event.href)
         }
 
         // Skips to previous/next pages if the tap is on the content edges.
@@ -319,7 +376,8 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         val defaultPrevented: Boolean,
         val point: PointF,
         val targetElement: String,
-        val interactiveElement: String?
+        val interactiveElement: String?,
+        val href: String?
     ) {
         companion object {
             fun fromJSONObject(obj: JSONObject?): TapEvent? {
@@ -332,7 +390,8 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
                     defaultPrevented = obj.optBoolean("defaultPrevented"),
                     point = PointF(x, y),
                     targetElement = obj.optString("targetElement"),
-                    interactiveElement = obj.optNullableString("interactiveElement")
+                    interactiveElement = obj.optNullableString("interactiveElement"),
+                    href = obj.optNullableString("href")
                 )
             }
 
@@ -340,6 +399,13 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
                 fromJSONObject(tryOrNull { JSONObject(json) })
         }
     }
+
+    private fun handleLink(href: String?): Boolean {
+        runBlocking(uiScope.coroutineContext) {shouldOverrideUrlLoading(Uri.parse(href))
+        }
+        return false
+    }
+
 
     private fun handleFootnote(html: String): Boolean {
         val resourceUrl = resourceUrl ?: return false
@@ -517,6 +583,12 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         }
     }
 
+    @android.webkit.JavascriptInterface
+    fun onSelection(eventJson: String) {
+      return runBlocking(uiScope.coroutineContext) { listener.onSelection(eventJson) }
+    }
+
+
     fun Boolean.toInt() = if (this) 1 else 0
 
     fun scrollToStart() {
@@ -534,6 +606,10 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         runJavaScript("readium.scrollToPosition(\"$progression\");")
     }
 
+    fun scrollToPartialCfi(partialCfi: String) {
+      runJavaScript("readium.scrollToPartialCfi(\"$partialCfi\");")
+    }
+
     suspend fun scrollToText(text: Locator.Text): Boolean {
         val json = text.toJSON().toString()
         return runJavaScriptSuspend("readium.scrollToText($json);").toBoolean()
@@ -546,11 +622,60 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
 
     fun setProperty(key: String, value: String) {
         runJavaScript("readium.setProperty(\"$key\", \"$value\");")
+
+        // font size cannot be change with CSS because of absolute font sizes on some epubs
+        if (key.endsWith(FONT_SIZE_REF)) {
+            applyFontSize()
+        }
     }
 
     fun removeProperty(key: String) {
         runJavaScript("readium.removeProperty(\"$key\");")
     }
+
+    private fun requestExtraLocationInfos(callback: (String) -> Unit) {
+        runJavaScript("readium.getExtraLocationInfos();", callback)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        scaleGestureDetector?.onTouchEvent(event)
+        return super.onTouchEvent(event)
+    }
+
+    private fun handlePinchZoom(scaleFactor: Float) {
+
+      // Increase the font size when pinching out
+      if (scaleFactor > 1.0f && settings.textZoom < 300) {
+        settings.textZoom += 1
+        listener.onFontSizeChange(settings.textZoom)
+      }
+      // Decrease the font size when pinching in
+      else if (scaleFactor < 1.0f && settings.textZoom > 100) {
+        settings.textZoom -= 1
+        listener.onFontSizeChange(settings.textZoom)
+      }
+
+      invalidate()
+    }
+
+    suspend fun getExtraLocationInfos(): Map<String, String>? =
+        suspendCoroutine { cont ->
+            requestExtraLocationInfos {
+                try {
+                    val json = JSONObject(it)
+
+                    cont.resume(
+                        mapOf(
+                            "startCfi" to json.getJSONObject("cfis").getString("startCfi"),
+                            "endCfi" to json.getJSONObject("cfis").getString("endCfi"),
+                            "visibleText" to json.getString("visibleText")
+                        )
+                    )
+                } catch (e: JSONException) {
+                    cont.resume(null)
+                }
+            }
+        }
 
     fun getCurrentSelectionInfo(callback: (String) -> Unit) {
         runJavaScript("getCurrentSelectionInfo();", callback)
@@ -606,8 +731,8 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
         }
     }
 
-    internal fun shouldOverrideUrlLoading(request: WebResourceRequest): Boolean {
-        if (resourceUrl == request.url?.toString()) return false
+    internal fun shouldOverrideUrlLoading(request: Uri): Boolean {
+        if (resourceUrl == request.toString()) return false
 
         return listener?.shouldOverrideUrlLoading(this, request) ?: false
     }
@@ -635,6 +760,12 @@ open class R2BasicWebView(context: Context, attrs: AttributeSet) : WebView(conte
 
         val parent = parent ?: return null
         return parent.startActionModeForChild(this, customCallback)
+    }
+
+    fun applyFontSize() {
+      preferences?.getFloat(FONT_SIZE_REF, 100.toFloat())?.let {
+        settings.textZoom = it.toInt()
+      }
     }
 
     /**

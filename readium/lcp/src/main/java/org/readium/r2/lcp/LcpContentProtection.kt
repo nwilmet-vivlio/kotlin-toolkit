@@ -15,6 +15,7 @@ import org.readium.r2.shared.publication.asset.FileAsset
 import org.readium.r2.shared.publication.asset.PublicationAsset
 import org.readium.r2.shared.publication.services.contentProtectionServiceFactory
 import org.readium.r2.shared.util.Try
+import timber.log.Timber
 
 internal class LcpContentProtection(
     private val lcpService: LcpService,
@@ -29,7 +30,7 @@ internal class LcpContentProtection(
         sender: Any?
     ): Try<ContentProtection.ProtectedAsset, Publication.OpeningException>? {
         if (asset !is FileAsset) {
-            return null
+            return Try.failure(Publication.OpeningException.UnsupportedFormat(Exception("Only `FileAsset` is supported with the `LcpContentProtection`, make sure you are trying to open a package from the file system")))
         }
 
         if (!lcpService.isLcpProtected(asset.file)) {

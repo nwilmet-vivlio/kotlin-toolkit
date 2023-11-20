@@ -61,7 +61,7 @@ class ImageNavigatorFragment private constructor(
     }
 
     internal lateinit var positions: List<Locator>
-    internal lateinit var resourcePager: R2ViewPager
+    lateinit var resourcePager: R2ViewPager
 
     internal lateinit var preferences: SharedPreferences
 

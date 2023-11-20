@@ -135,7 +135,8 @@ class EpubPositionsService(
                     locator
                 } else {
                     locator.copyWithLocations(
-                        totalProgression = (position - 1) / totalPageCount.toDouble()
+                        totalProgression = (position - 1) / totalPageCount.toDouble(),
+                        totalPageCount = totalPageCount
                     )
                 }
             }

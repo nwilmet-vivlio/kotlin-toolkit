@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body,
+      html {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      .viewport {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 50%;
+        overflow: hidden;
+      }
+
+      .viewport-half {
+        width: 50%;
+      }
+
+      .viewport-full {
+        width: 100%;
+      }
+
+      #viewport-left {
+        left: 0;
+      }
+
+      #viewport-right {
+        right: 0;
+      }
+
+      #viewport-center {
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .page {
+        /* Centers vertically the iframe */
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+
+        width: 0px;
+        height: 0px;
+        border: none;
+        background: white;
+      }
+
+      #page-left {
+        right: 0;
+        overflow: hidden;
+      }
+
+      #page-right {
+        left: 0;
+        overflow: hidden;
+      }
+
+      #page-center {
+        /* Centers vertically and horizontally the iframe */
+        left: 50%;
+        transform: translate(-50%, -50%);
+        overflow: hidden;
+      }
+    </style>
+
+    <meta name="viewport" content="" />
+  </head>
+
+  <body>
+    <div id="viewport-left" class="viewport viewport-half">
+      <iframe id="page-left" class="page"></iframe>
+    </div>
+    <div id="viewport-right" class="viewport viewport-half">
+      <iframe id="page-right" class="page"></iframe>
+    </div>
+    <div id="viewport-center" class="viewport viewport-full">
+      <iframe id="page-center" class="page"></iframe>
+    </div>
+  </body>
+  <script>
+    var _viewportWidth = 0;
+    var _viewportHeight = 0;
+    const _left = document.getElementById("page-left");
+    const _right = document.getElementById("page-right");
+    const _center = document.getElementById("page-center");
+
+    function layoutPage(side) {
+      let regex = /(\w+) *= *([^\s,]+)/g;
+      let properties = {};
+      let match;
+
+      let contentWidth;
+      let contentHeight;
+      try {
+        let iframeViewport = side.contentDocument.querySelector("meta[name=viewport]");
+        while ((match = regex.exec(iframeViewport.content))) {
+          properties[match[1]] = match[2];
+        }
+
+        let width = Number.parseFloat(properties.width);
+        let height = Number.parseFloat(properties.height);
+
+        if (width && height) {
+          contentWidth = width;
+          contentHeight = height;
+        } else {
+          contentWidth = side.contentWindow.document.body.clientWidth ?? _viewportWidth;
+          contentHeight = side.contentWindow.document.body.clientHeight ?? _viewportHeight;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      side.style.width = `${contentWidth}px`;
+      side.style.height = `${contentHeight}px`;
+      side.style.zIndex = 10;
+      // Avoid scroll when zoom
+      side.contentWindow.document.body.style.overflow = "hidden";
+      // Compute scale
+      let scale = Math.min(_viewportWidth / contentWidth, _viewportHeight / contentHeight);
+      let viewport = document.querySelector("meta[name=viewport]");
+      viewport.content = `initial-scale=${scale},minimum-scale=${scale},width=${_viewportWidth}`;
+    }
+    function refreshPages() {
+      if (_left.src != "") {
+        layoutPage(_left);
+      }
+      if (_right.src != "") {
+        layoutPage(_right);
+      }
+      if (_center.src != "") {
+        layoutPage(_center);
+      }
+    }
+    function setLayout(viewportWidth, viewportHeight) {
+      _viewportWidth = viewportWidth;
+      _viewportHeight = viewportHeight;
+    }
+    _left.onload = function () {
+      layoutPage(_left);
+    };
+    _right.onload = function () {
+      layoutPage(_right);
+    };
+    _center.onload = function () {
+      layoutPage(_center);
+    };
+
+    function onClick(event) {
+      if (!window.getSelection().isCollapsed) {
+        // There's an on-going selection, the tap will dismiss it so we don't forward it.
+        return;
+      }
+
+      var pixelRatio = window.devicePixelRatio;
+      let clickEvent = {
+        defaultPrevented: event.defaultPrevented,
+        x: event.screenX * pixelRatio,
+        y: event.screenY * pixelRatio,
+        targetElement: event.target.outerHTML,
+        interactiveElement: null,
+        href: null,
+      };
+
+      // Send the tap data over the JS bridge even if it's been handled within the web view, so that
+      // it can be preserved and used by the toolkit if needed.
+      var shouldPreventDefault = Android.onTap(JSON.stringify(clickEvent));
+
+      if (shouldPreventDefault) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+    }
+    window.addEventListener("DOMContentLoaded", function () {
+      document.addEventListener("click", onClick, false);
+    });
+  </script>
+</html>

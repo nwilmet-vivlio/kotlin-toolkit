@@ -111,7 +111,7 @@ interface LcpService {
          * LCP service factory.
          */
         operator fun invoke(context: Context): LcpService? {
-            if (!LcpClient.isAvailable())
+            if (!CareClient.isAvailable())
                 return null
 
             val db = LcpDatabase.getDatabase(context).lcpDao()

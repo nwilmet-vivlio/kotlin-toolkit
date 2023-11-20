@@ -148,12 +148,9 @@ class R2EpubPageFragment : Fragment() {
             }
         }
         webView.preferences = preferences
-
-        if (viewModel.useLegacySettings) {
-            @Suppress("DEPRECATION")
-            webView.setScrollMode(preferences.getBoolean(SCROLL_REF, false))
-        }
         webView.useLegacySettings = viewModel.useLegacySettings
+        webView.applyFontSize()
+        webView.setScrollMode(preferences.getBoolean(SCROLL_REF, false))
         webView.settings.javaScriptEnabled = true
         webView.isVerticalScrollBarEnabled = false
         webView.isHorizontalScrollBarEnabled = false
@@ -166,6 +163,7 @@ class R2EpubPageFragment : Fragment() {
         webView.resourceUrl = resourceUrl
         webView.setPadding(0, 0, 0, 0)
         webView.addJavascriptInterface(webView, "Android")
+        webView.setScaleGestureDetectorForFontSize()
 
         var endReached = false
         webView.setOnOverScrolledCallback(object : R2BasicWebView.OnOverScrolledCallback {
@@ -202,7 +200,7 @@ class R2EpubPageFragment : Fragment() {
         webView.webViewClient = object : WebViewClientCompat() {
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
-                (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request) ?: false
+                (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request.url) ?: false
 
             override fun shouldOverrideKeyEvent(view: WebView, event: KeyEvent): Boolean {
                 // Do something with the event here
@@ -403,6 +401,27 @@ class R2EpubPageFragment : Fragment() {
 
         if (webView.scrollMode) {
             webView.scrollToPosition(progression)
+        } else {
+            // Figure out the target web view "page" from the requested
+            // progression.
+            var item = (progression * webView.numPages).roundToInt()
+            if (readingProgression == ReadingProgression.RTL && item > 0) {
+                item -= 1
+            }
+            webView.setCurrentItem(item, false)
+        }
+
+        var progression = locator.locations.progression ?: 0.0
+
+        // We need to reverse the progression with RTL because the Web View
+        // always scrolls from left to right, no matter the reading direction.
+        progression =
+            if (webView.scrollMode || readingProgression == ReadingProgression.LTR) progression
+            else 1 - progression
+
+        if (webView.scrollMode) {
+            webView.scrollToPosition(progression)
+
         } else {
             // Figure out the target web view "page" from the requested
             // progression.

@@ -149,5 +149,6 @@ fun PdfDocument.OutlineNode.toLink(documentHref: String): Link =
         href = "$documentHref#page=$pageNumber",
         type = MediaType.PDF.toString(),
         title = title,
-        children = children.toLinks(documentHref)
+        children = children.toLinks(documentHref),
+        position = pageNumber
     )

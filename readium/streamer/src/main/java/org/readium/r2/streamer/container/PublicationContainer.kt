@@ -48,5 +48,6 @@ internal class PublicationContainer(
     override fun dataInputStream(relativePath: String): InputStream =
         ResourceInputStream(publication.get(relativePath)).buffered()
 
+
     private fun Publication.get(href: String) = get(Link(href))
 }

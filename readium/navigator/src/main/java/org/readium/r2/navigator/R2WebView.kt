@@ -39,6 +39,16 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
 
     private val uiScope = CoroutineScope(Dispatchers.Main)
 
+    private var targetScrollX = -1
+
+    override fun onScrollChanged(scrollX: Int, scrollY: Int, oldScrollX: Int, oldScrollY: Int) {
+        super.onScrollChanged(scrollX, scrollY, oldScrollX, oldScrollY)
+        if (targetScrollX >= 0 && scrollX != targetScrollX) {
+            scrollTo(targetScrollX, scrollY)
+        }
+        targetScrollX = -1
+    }
+
     @android.webkit.JavascriptInterface
     override fun scrollRight(animated: Boolean) {
         super.scrollRight(animated)
@@ -463,6 +473,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
                 val newOffsetPixels = (pageOffset * widthWithMargin).toInt()
 
                 scrollTo(newOffsetPixels, scrollY)
+                targetScrollX = newOffsetPixels
             }
         } else {
             val ii = infoForPosition(mCurItem)
@@ -784,7 +795,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
                 scrollToItem(mCurItem, true, 0, false)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                val index = ev.actionIndex
+                val index = 0 // we put 0 to avoid pinching shift issue
                 val x = ev.getX(index)
                 mLastMotionX = x
                 mActivePointerId = ev.getPointerId(index)

@@ -166,45 +166,41 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
 
                 binding.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                     /**
-                     * Notification that the progress level has changed. Clients can use the fromUser parameter
-                     * to distinguish user-initiated changes from those that occurred programmatically.
-                     *
-                     * @param seekBar The SeekBar whose progress has changed
-                     * @param progress The current progress level. This will be in the range min..max where min
-                     * @param fromUser True if the progress change was initiated by the user.
-                     */
-                    override fun onProgressChanged(
-                        seekBar: SeekBar?,
-                        progress: Int,
-                        fromUser: Boolean
-                    ) {
+                    * Notification that the progress level has changed. Clients can use the fromUser parameter
+                    * to distinguish user-initiated changes from those that occurred programmatically.
+                    *
+                    * @param seekBar The SeekBar whose progress has changed
+                    * @param progress The current progress level. This will be in the range min..max where min
+                    * @param fromUser True if the progress change was initiated by the user.
+                    */
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                         if (!fromUser) {
                             return
                         }
                         mediaPlayer.seekTo(progress)
-                        if (DEBUG) Timber.d("progress $progress")
+                        if (DEBUG) Timber.tag("AUDIO").d("progress $progress")
                     }
 
                     /**
-                     * Notification that the user has started a touch gesture. Clients may want to use this
-                     * to disable advancing the seekbar.
-                     * @param seekBar The SeekBar in which the touch gesture began
-                     */
+                    * Notification that the user has started a touch gesture. Clients may want to use this
+                    * to disable advancing the seekbar.
+                    * @param seekBar The SeekBar in which the touch gesture began
+                    */
                     override fun onStartTrackingTouch(seekBar: SeekBar?) {
                         // do nothing
                         isSeekTracking = true
-                        if (DEBUG) Timber.d("start tracking")
+                        if (DEBUG) Timber.tag("AUDIO").d("start tracking")
                     }
 
                     /**
-                     * Notification that the user has finished a touch gesture. Clients may want to use this
-                     * to re-enable advancing the seekbar.
-                     * @param seekBar The SeekBar in which the touch gesture began
-                     */
+                    * Notification that the user has finished a touch gesture. Clients may want to use this
+                    * to re-enable advancing the seekbar.
+                    * @param seekBar The SeekBar in which the touch gesture began
+                    */
                     override fun onStopTrackingTouch(seekBar: SeekBar?) {
                         // do nothing
                         isSeekTracking = false
-                        if (DEBUG) Timber.d("stop tracking")
+                        if (DEBUG) Timber.tag("AUDIO").d("stop tracking")
                     }
                 })
 
