@@ -52,7 +52,7 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-navigator"
 apply(from = "$rootDir/scripts/publish-module.gradle")
-afterEvaluate {
+/*afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
@@ -64,7 +64,7 @@ afterEvaluate {
             }
         }
     }
-}
+}*/
 
 dependencies {
     api(project(":readium:readium-shared"))
@@ -89,8 +89,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.7.1")
     implementation("com.duolingo.open:rtl-viewpager:1.0.3")
 
-    api(project(":android-pdf-viewer"))
-    api(project(":pdfium"))
+    //api(project(":android-pdf-viewer"))
+    //api(project(":pdfium"))
 
     // ChrisBane/PhotoView ( for the Zoom handling )
     implementation("com.github.chrisbanes:PhotoView:2.3.0")

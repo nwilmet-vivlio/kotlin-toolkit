@@ -42,7 +42,7 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-streamer"
 apply(from = "$rootDir/scripts/publish-module.gradle")
-afterEvaluate {
+/*afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
@@ -54,7 +54,7 @@ afterEvaluate {
             }
         }
     }
-}
+}*/
 
 dependencies {
     api(project(":readium:readium-shared"))
@@ -66,7 +66,7 @@ dependencies {
     implementation(libs.timber)
     // AM NOTE: conflicting support libraries, excluding these
     implementation("androidx.appcompat:appcompat:1.4.1")
-    api(project(":pdfium"))
+    //api(project(":pdfium"))
     implementation("com.jakewharton.timber:timber:5.0.1")
     implementation("com.github.readium.nanohttpd:nanohttpd:master-SNAPSHOT") {
         exclude(group = "org.parboiled")

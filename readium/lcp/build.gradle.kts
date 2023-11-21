@@ -42,7 +42,7 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-lcp"
 apply(from = "$rootDir/scripts/publish-module.gradle")
-afterEvaluate {
+/*afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
@@ -54,7 +54,7 @@ afterEvaluate {
             }
         }
     }
-}
+}*/
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)

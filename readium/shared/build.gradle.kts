@@ -43,7 +43,7 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-shared"
 apply(from = "$rootDir/scripts/publish-module.gradle")
-afterEvaluate {
+/*afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
@@ -55,7 +55,7 @@ afterEvaluate {
             }
         }
     }
-}
+}*/
 
 dependencies {
     implementation(libs.androidx.appcompat)
