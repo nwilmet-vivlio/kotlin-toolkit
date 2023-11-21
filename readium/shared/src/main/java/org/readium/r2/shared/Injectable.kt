@@ -15,7 +15,8 @@ import org.readium.r2.shared.util.MapCompanion
 enum class Injectable(val rawValue: String) : Serializable {
     Script("scripts"),
     Font("fonts"),
-    Style("styles");
+    Style("styles"),
+    Html("html");
 
     companion object : MapCompanion<String, Injectable>(values(), Injectable::rawValue)
 

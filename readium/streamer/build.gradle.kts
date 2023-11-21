@@ -42,6 +42,19 @@ android {
 
 rootProject.ext["publish.artifactId"] = "readium-streamer"
 apply(from = "$rootDir/scripts/publish-module.gradle")
+/*afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components.getByName("release"))
+                groupId = "com.github.readium"
+                artifactId = "readium-streamer"
+//                artifact(tasks.findByName("sourcesJar"))
+//                artifact(tasks.findByName("javadocsJar"))
+            }
+        }
+    }
+}*/
 
 dependencies {
     api(project(":readium:readium-shared"))
@@ -52,6 +65,16 @@ dependencies {
     @Suppress("GradleDependency")
     implementation(libs.timber)
     // AM NOTE: conflicting support libraries, excluding these
+    implementation("androidx.appcompat:appcompat:1.4.1")
+    //api(project(":pdfium"))
+    implementation("com.jakewharton.timber:timber:5.0.1")
+    implementation("com.github.readium.nanohttpd:nanohttpd:master-SNAPSHOT") {
+        exclude(group = "org.parboiled")
+    }
+    implementation("com.github.readium.nanohttpd:nanohttpd-nanolets:master-SNAPSHOT") {
+        exclude(group = "org.parboiled")
+    }
+    //AM NOTE: conflicting support libraries, excluding these
     implementation("com.mcxiaoke.koi:core:0.5.5") {
         exclude(module = "support-v4")
     }

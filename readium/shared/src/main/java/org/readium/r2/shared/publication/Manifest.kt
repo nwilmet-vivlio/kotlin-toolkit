@@ -36,8 +36,8 @@ data class Manifest(
     var links: List<Link> = emptyList(),
     val readingOrder: List<Link> = emptyList(),
     val resources: List<Link> = emptyList(),
-    val tableOfContents: List<Link> = emptyList(),
-    val subcollections: Map<String, List<PublicationCollection>> = emptyMap()
+    var tableOfContents: List<Link> = emptyList(),
+    var subcollections: Map<String, List<PublicationCollection>> = emptyMap()
 
 ) : JSONable, Parcelable {
 
@@ -106,6 +106,35 @@ data class Manifest(
      */
     fun linksWithRel(rel: String): List<Link> =
         (readingOrder + resources + links).filterByRel(rel)
+
+    private fun setLinksPosition(links: List<Link>, locators: List<List<Locator>>): List<Link> {
+        for (link in links) {
+            val href = link.href.split("#")[0]
+            for (positions in locators) {
+                if (positions[0].href == href) {
+                    link.position = positions[0].locations.position
+                }
+            }
+            if (link.children.isNotEmpty()) {
+                link.children = setLinksPosition(link.children, locators)
+            }
+        }
+        return links
+    }
+
+    fun overrideNumberOfPagesAndTocPositions(locators: List<List<Locator>>): Manifest {
+        if (this.conformsTo(Publication.Profile.EPUB)) {
+            this.metadata.numberOfPages = locators[0][0].locations.totalPageCount
+            if (this.tableOfContents.isNotEmpty()) {
+                val newToc = setLinksPosition(this.tableOfContents, locators)
+                this.tableOfContents = newToc
+            }
+        }
+        else if (this.conformsTo(Publication.Profile.PDF)) {
+            this.metadata.numberOfPages = locators[0].size
+        }
+        return this
+    }
 
     /**
      * Creates a new [Locator] object from a [Link] to a resource of this manifest.

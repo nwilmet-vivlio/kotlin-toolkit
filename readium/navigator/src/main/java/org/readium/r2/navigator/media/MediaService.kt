@@ -320,19 +320,15 @@ open class MediaService : MediaBrowserServiceCompat(), CoroutineScope by MainSco
 
         val currentNavigator: StateFlow<MediaSessionNavigator?> get() = navigator
 
-        fun getNavigator(
-            context: Context,
-            publication: Publication,
-            publicationId: PublicationId,
-            initialLocator: Locator?
-        ): MediaSessionNavigator {
+
+        fun getNavigator(context: Context, publication: Publication, publicationId: PublicationId, initialLocator: Locator?, publicationMetadata: Bundle? = null, publicationCover: Bitmap? = null): MediaSessionNavigator {
             context.startForegroundServiceCompat(Intent(context, serviceClass))
 
             currentNavigator.value
                 ?.takeIf { it.publicationId == publicationId }
                 ?.let { return it }
 
-            val navigator = MediaSessionNavigator(publication, publicationId, getMediaSession(context, serviceClass).controller)
+            val navigator = MediaSessionNavigator(publication, publicationId, getMediaSession(context, serviceClass).controller, publicationMetadata, publicationCover)
             pendingNavigator.trySend(
                 PendingNavigator(
                     navigator = navigator,

@@ -132,19 +132,16 @@ internal class HtmlInjector(
 
         // Disable the text selection if the publication is protected.
         // FIXME: This is a hack until proper LCP copy is implemented, see https://github.com/readium/r2-testapp-kotlin/issues/266
-        if (publication.isProtected) {
-            resourceHtml = StringBuilder(resourceHtml).insert(
-                endHeadIndex,
-                """
+        /*if (publication.isProtected) {
+            resourceHtml = StringBuilder(resourceHtml).insert(endHeadIndex, """
                 <style>
                 *:not(input):not(textarea) {
                     user-select: none;
                     -webkit-user-select: none;
                 }
                 </style>
-            """
-            ).toString()
-        }
+            """).toString()
+        }*/
 
         // Inject userProperties
         getProperties(publication.userSettingsUIPreset)?.let { propertyPair ->

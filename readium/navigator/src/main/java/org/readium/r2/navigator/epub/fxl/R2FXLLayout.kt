@@ -187,10 +187,11 @@ class R2FXLLayout : FrameLayout {
 
     private fun init(context: Context) {
         gestureListener = GestureListener()
-        scaleDetector = ScaleGestureDetector(context, gestureListener!!)
-
+        gestureListener?.let {
+            scaleDetector = ScaleGestureDetector(context, it)
+            gestureDetector = GestureDetector(context, it)
+        }
         scaleDetector!!.isQuickScaleEnabled = false
-        gestureDetector = GestureDetector(context, gestureListener!!)
         simpleOnGlobalLayoutChangedListener = SimpleOnGlobalLayoutChangedListener()
         viewTreeObserver.addOnGlobalLayoutListener(simpleOnGlobalLayoutChangedListener)
     }
@@ -748,6 +749,13 @@ class R2FXLLayout : FrameLayout {
                 i++
             }
         }
+    }
+
+    fun addOnZoomListeners(l: OnZoomListener) {
+      if (onZoomListeners == null) {
+        onZoomListeners = ArrayList()
+      }
+      onZoomListeners!!.add(l)
     }
 
     private fun dispatchOnLongTap(ev: MotionEvent) {

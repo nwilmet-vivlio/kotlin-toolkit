@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+        body, html {
+          margin: 0;
+          background: transparent;
+          height: 100%;
+          width: 100%;
+        }
+        #page {
+            position: absolute;
+            top: 0;
+            padding:0;
+            margin:0;
+            border: none;
+        }
+        .page-left {
+            right:0;
+        }
+        .page-right {
+            left: 0;
+        }
+        .page-center {
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+    <meta name="viewport" content="">
+  </head>
+  <body>
+    <iframe id="page"></iframe>
+  </body>
+  <script>
+      var _viewportWidth = 0;
+      var _viewportHeight = 0;
+      const _iframe =  document.getElementById('page');
+      function layoutPage() {
+          let contentWidth = document.getElementById('page').contentWindow.document.body.clientWidth;
+          let contentHeight = document.getElementById('page').contentWindow.document.body.clientHeight;
+          _iframe.style.width = `${contentWidth}px`;
+          _iframe.style.height = `${contentHeight}px`;
+          // Compute scale
+          let scale = Math.min(_viewportWidth / contentWidth, _viewportHeight / contentHeight);
+          let viewport = document.querySelector("meta[name=viewport]");
+          viewport.content = `initial-scale=${scale},minimum-scale=${scale},width=${_viewportWidth}`;
+      }
+      function setLayout(viewportWidth, viewportHeight, pageKlass) {
+          _viewportWidth = viewportWidth;
+          _viewportHeight = viewportHeight;
+          _iframe.classList.add(pageKlass);
+      }
+      _iframe.onload = function() {
+          layoutPage();
+      }
+  </script>
+</html>

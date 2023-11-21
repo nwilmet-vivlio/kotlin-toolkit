@@ -50,6 +50,7 @@ data class Locator(
      * @param position An index in the publication (>= 1).
      * @param totalProgression Progression in the publication expressed as a percentage (between 0
      *        and 1).
+     * @param totalPageCount Total page count of the publication
      * @param otherLocations Additional locations for extensions.
      */
     @Parcelize
@@ -58,6 +59,7 @@ data class Locator(
         val progression: Double? = null,
         val position: Int? = null,
         val totalProgression: Double? = null,
+        val totalPageCount: Int? = null,
         val otherLocations: @WriteWith<JSONParceler> Map<String, Any> = emptyMap()
     ) : JSONable, Parcelable {
 
@@ -65,6 +67,7 @@ data class Locator(
             putIfNotEmpty("fragments", fragments)
             put("progression", progression)
             put("position", position)
+            put("totalPageCount", totalPageCount)
             put("totalProgression", totalProgression)
         }
 
@@ -90,11 +93,15 @@ data class Locator(
                 val totalProgression = json?.optNullableDouble("totalProgression", remove = true)
                     ?.takeIf { it in 0.0..1.0 }
 
+                val totalPageCount = json?.optNullableInt("totalPageCount", remove = true)
+                  ?.takeIf { it > 0 }
+
                 return Locations(
                     fragments = fragments,
                     progression = progression,
                     position = position,
                     totalProgression = totalProgression,
+                    totalPageCount = totalPageCount,
                     otherLocations = json?.toMap() ?: emptyMap()
                 )
             }
@@ -155,6 +162,7 @@ data class Locator(
         progression: Double? = locations.progression,
         position: Int? = locations.position,
         totalProgression: Double? = locations.totalProgression,
+        totalPageCount: Int? = locations.totalPageCount,
         otherLocations: Map<String, Any> = locations.otherLocations
     ) = copy(
         locations = locations.copy(
@@ -162,6 +170,7 @@ data class Locator(
             progression = progression,
             position = position,
             totalProgression = totalProgression,
+            totalPageCount = totalPageCount,
             otherLocations = otherLocations
         )
     )

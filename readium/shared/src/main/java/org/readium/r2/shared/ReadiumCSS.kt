@@ -27,6 +27,8 @@ const val PAGE_MARGINS_REF = "pageMargins"
 @Deprecated("Migrate to the new Settings API (see migration guide)")
 const val LINE_HEIGHT_REF = "lineHeight"
 
+const val ZOOM_VALUE_REF = "zoom"
+
 @Deprecated("Migrate to the new Settings API (see migration guide)")
 const val FONT_SIZE_NAME = "--USER__$FONT_SIZE_REF"
 @Deprecated("Migrate to the new Settings API (see migration guide)")

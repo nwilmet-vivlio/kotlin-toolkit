@@ -161,6 +161,7 @@ class StringSearchService(
             var totalProgression: Double? = null
             val positions = positions()
             val resourceStartTotalProg = positions.getOrNull(resourceIndex)?.firstOrNull()?.locations?.totalProgression
+            val position = positions.getOrNull(resourceIndex)?.firstOrNull()?.locations?.position
             if (resourceStartTotalProg != null) {
                 val resourceEndTotalProg = positions.getOrNull(resourceIndex + 1)?.firstOrNull()?.locations?.totalProgression ?: 1.0
                 totalProgression = resourceStartTotalProg + progression * (resourceEndTotalProg - resourceStartTotalProg)
@@ -170,6 +171,7 @@ class StringSearchService(
                 locations = resourceLocator.locations.copy(
                     progression = progression,
                     totalProgression = totalProgression,
+                    position = position
                 ),
                 text = createSnippet(text, range),
             )

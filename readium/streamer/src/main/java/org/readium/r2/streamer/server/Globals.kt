@@ -14,3 +14,8 @@ package org.readium.r2.streamer.server
  */
 @Deprecated("Use Publication::localBaseUrlOf() instead")
 const val BASE_URL = "http://127.0.0.1"
+
+/**
+ *
+ */
+const val DEFAULT_BUFFER_SIZE: Int = 1024 * 1024

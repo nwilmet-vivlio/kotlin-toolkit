@@ -9,12 +9,11 @@ package org.readium.adapters.pdfium.document
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
-import com.shockwave.pdfium.PdfDocument as _PdfiumDocument
-import com.shockwave.pdfium.PdfiumCore
 import java.io.File
 import kotlin.reflect.KClass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.vivlio.android.pdfium.PdfiumCore
 import org.readium.r2.shared.PdfSupport
 import org.readium.r2.shared.extensions.md5
 import org.readium.r2.shared.extensions.tryOrNull
@@ -23,6 +22,8 @@ import org.readium.r2.shared.util.pdf.PdfDocument
 import org.readium.r2.shared.util.pdf.PdfDocumentFactory
 import org.readium.r2.shared.util.use
 import timber.log.Timber
+import java.io.File
+import com.vivlio.android.pdfium.PdfDocument as _PdfiumDocument
 
 @OptIn(PdfSupport::class)
 class PdfiumDocument(

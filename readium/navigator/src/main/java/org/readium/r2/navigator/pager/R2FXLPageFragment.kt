@@ -10,7 +10,6 @@
 package org.readium.r2.navigator.pager
 
 import android.annotation.SuppressLint
-import android.graphics.PointF
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -18,16 +17,20 @@ import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.webkit.WebViewClientCompat
 import org.readium.r2.navigator.R2BasicWebView
-import org.readium.r2.navigator.databinding.FragmentFxllayoutDoubleBinding
-import org.readium.r2.navigator.databinding.FragmentFxllayoutSingleBinding
+import org.readium.r2.navigator.databinding.ViewpagerFragmentEpubFxlBinding
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorViewModel
 import org.readium.r2.navigator.epub.fxl.R2FXLLayout
 import org.readium.r2.navigator.epub.fxl.R2FXLOnDoubleTapListener
+import java.lang.Math.abs
+import java.lang.Math.round
+import java.net.URI
+import kotlin.math.roundToInt
 
 class R2FXLPageFragment : Fragment() {
 
@@ -39,65 +42,27 @@ class R2FXLPageFragment : Fragment() {
 
     private var webViews = mutableListOf<R2BasicWebView>()
 
-    private var _doubleBinding: FragmentFxllayoutDoubleBinding? = null
-    private val doubleBinding get() = _doubleBinding!!
-
-    private var _singleBinding: FragmentFxllayoutSingleBinding? = null
-    private val singleBinding get() = _singleBinding!!
+    private var _binding: ViewpagerFragmentEpubFxlBinding? = null
+    private val binding get() = _binding!!
 
     private val navigator: EpubNavigatorFragment?
         get() = parentFragment as? EpubNavigatorFragment
 
-    private val viewModel: EpubNavigatorViewModel by viewModels(ownerProducer = { requireParentFragment() })
+    private var scaleValue = 1.0f
 
     @SuppressLint("SetJavaScriptEnabled")
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+        _binding = ViewpagerFragmentEpubFxlBinding.inflate(inflater, container, false)
+        val view: View = binding.root
+        view.setPadding(0, 0, 0, 0)
+        val r2FXLLayout = binding.r2FXLLayout
+        val webview = binding.webView
 
         secondResourceUrl?.let {
-            _doubleBinding = FragmentFxllayoutDoubleBinding.inflate(inflater, container, false)
-            val view: View = doubleBinding.root
-            view.setPadding(0, 0, 0, 0)
-
-            val r2FXLLayout = doubleBinding.r2FXLLayout
-            r2FXLLayout.isAllowParentInterceptOnScaled = true
-
-            val left = doubleBinding.firstWebView
-            val right = doubleBinding.secondWebView
-
-            setupWebView(left, firstResourceUrl)
-            setupWebView(right, secondResourceUrl)
-
-            r2FXLLayout.addOnDoubleTapListener(R2FXLOnDoubleTapListener(true))
-            r2FXLLayout.addOnTapListener(object : R2FXLLayout.OnTapListener {
-                override fun onTap(view: R2FXLLayout, info: R2FXLLayout.TapInfo): Boolean {
-                    return left.listener?.onTap(PointF(info.x, info.y)) ?: false
-                }
-            })
-
+            setupDoubleWebView(r2FXLLayout, webview, firstResourceUrl, secondResourceUrl)
             return view
-        } ?: run {
-            _singleBinding = FragmentFxllayoutSingleBinding.inflate(inflater, container, false)
-            val view: View = singleBinding.root
-            view.setPadding(0, 0, 0, 0)
-
-            val r2FXLLayout = singleBinding.r2FXLLayout
-            r2FXLLayout.isAllowParentInterceptOnScaled = true
-
-            val webview = singleBinding.webViewSingle
-
-            setupWebView(webview, firstResourceUrl)
-
-            r2FXLLayout.addOnDoubleTapListener(R2FXLOnDoubleTapListener(true))
-            r2FXLLayout.addOnTapListener(object : R2FXLLayout.OnTapListener {
-                override fun onTap(view: R2FXLLayout, info: R2FXLLayout.TapInfo): Boolean {
-                    return webview.listener?.onTap(PointF(info.x, info.y)) ?: false
-                }
-            })
-
+        }?:run {
+            setupWebView(r2FXLLayout, webview, firstResourceUrl)
             return view
         }
     }
@@ -115,17 +80,12 @@ class R2FXLPageFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        for (webView in webViews) {
-            webView.listener = null
-        }
-        _singleBinding = null
-        _doubleBinding = null
-
         super.onDestroyView()
+        _binding = null
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun setupWebView(webView: R2BasicWebView, resourceUrl: String?) {
+    private fun setupWebView(viewport: ConstraintLayout, webView: R2BasicWebView, resourceUrl: String?) {
         webViews.add(webView)
         navigator?.let {
             webView.listener = it.webViewListener
@@ -145,7 +105,69 @@ class R2FXLPageFragment : Fragment() {
         // See https://github.com/readium/kotlin-toolkit/issues/76
         webView.settings.textZoom = 100
 
-        webView.setInitialScale(1)
+        webView.setPadding(0, 0, 0, 0)
+        webView.addJavascriptInterface(webView, "Android")
+        webView.setScaleGestureDetectorForScale()
+
+        webView.webViewClient = object : WebViewClientCompat() {
+
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request.url) ?: false
+
+            // prevent favicon.ico to be loaded, this was causing NullPointerException in NanoHttp
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (!request.isForMainFrame && request.url.path?.endsWith("/favicon.ico") == true) {
+                    try {
+                        return WebResourceResponse("image/png", null, null)
+                    } catch (e: Exception) {
+                    }
+                }
+                return null
+            }
+
+            override fun onPageFinished(view: WebView, url:String) {
+                val dpRatio = context!!.resources.displayMetrics.density
+                resourceUrl?.let {
+                    val w = view.width
+                    val h = view.height
+                    webView.evaluateJavascript("setLayout(${w/dpRatio},${h/dpRatio});document.getElementById('page-center').src = '${it}';") {
+                    }
+                }
+            }
+
+            override fun onScaleChanged(view: WebView?, oldScale: Float, newScale: Float) {
+                super.onScaleChanged(view, oldScale, newScale)
+                webView.scaleValue = newScale
+            }
+        }
+        webView.isHapticFeedbackEnabled = false
+        webView.isLongClickable = false
+        webView.setOnLongClickListener {
+            true
+        }
+        // Get base server for assets
+        resourceUrl?.let {
+          val url = URI(resourceUrl)
+              url.scheme?.let {
+                  webView.loadUrl("${url.scheme}://${url.host}:${url.port}/assets/html/fxl-spread.html")
+              }
+        }
+    }
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupDoubleWebView(viewport: ConstraintLayout, webView: R2BasicWebView, leftUrl: String?, rightUrl: String?) {
+        webViews.add(webView)
+        navigator?.let {
+            webView.listener = it.webViewListener
+        }
+
+        webView.settings.javaScriptEnabled = true
+        webView.isVerticalScrollBarEnabled = false
+        webView.isHorizontalScrollBarEnabled = false
+        webView.settings.useWideViewPort = true
+        webView.settings.loadWithOverviewMode = true
+        webView.settings.setSupportZoom(true)
+        webView.settings.builtInZoomControls = true
+        webView.settings.displayZoomControls = false
 
         webView.setPadding(0, 0, 0, 0)
         webView.addJavascriptInterface(webView, "Android")
@@ -153,18 +175,56 @@ class R2FXLPageFragment : Fragment() {
         webView.webViewClient = object : WebViewClientCompat() {
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
-                (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request) ?: false
+                (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request.url) ?: false
 
-            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-                (webView as? R2BasicWebView)?.shouldInterceptRequest(view, request)
+            // prevent favicon.ico to be loaded, this was causing NullPointerException in NanoHttp
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (!request.isForMainFrame && request.url.path?.endsWith("/favicon.ico") == true) {
+                    try {
+                        return WebResourceResponse("image/png", null, null)
+                    } catch (e: Exception) {
+                    }
+                }
+                return null
+            }
+
+            override fun onPageFinished(view: WebView, url:String) {
+                val dpRatio = context!!.resources.displayMetrics.density
+
+                leftUrl?.let {
+                    val w = view.width/2
+                    val h = viewport.height
+                    webView.evaluateJavascript("setLayout(${w / dpRatio},${h / dpRatio});document.getElementById('page-left').src = '${it}';") {
+                    }
+                }
+
+                rightUrl?.let {
+                    val w = view.width/2
+                    val h = viewport.height
+                    webView.evaluateJavascript("setLayout(${w / dpRatio},${h / dpRatio});document.getElementById('page-right').src = '${it}';") {
+                    }
+                }
+            }
         }
+
         webView.isHapticFeedbackEnabled = false
         webView.isLongClickable = false
         webView.setOnLongClickListener {
             true
         }
-
-        resourceUrl?.let { webView.loadUrl(it) }
+        // Get base server for assets
+        if (leftUrl != null && leftUrl.isNotEmpty()) {
+            val url = URI(leftUrl)
+            url.scheme?.let {
+                webView.loadUrl("${url.scheme}://${url.host}:${url.port}/assets/html/fxl-spread.html")
+            }
+        }
+        else if (rightUrl != null && rightUrl.isNotEmpty()) {
+            val url = URI(rightUrl)
+            url.scheme?.let {
+                webView.loadUrl("${url.scheme}://${url.host}:${url.port}/assets/html/fxl-spread.html")
+            }
+        }
     }
 
     companion object {

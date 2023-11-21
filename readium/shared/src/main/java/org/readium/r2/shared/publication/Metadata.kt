@@ -57,7 +57,7 @@ data class Metadata(
     val readingProgression: ReadingProgression = ReadingProgression.AUTO,
     val description: String? = null,
     val duration: Double? = null,
-    val numberOfPages: Int? = null,
+    var numberOfPages: Int? = null,
     val belongsTo: Map<String, List<Collection>> = emptyMap(),
     val otherMetadata: @WriteWith<JSONParceler> Map<String, Any> = mapOf()
 ) : JSONable, Parcelable {

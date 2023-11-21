@@ -46,9 +46,10 @@ abstract class AbstractServer(
     private val JSON_MANIFEST_HANDLE = "/manifest.json"
     private val MANIFEST_ITEM_HANDLE = "/(.*)"
     private val MEDIA_OVERLAY_HANDLE = "/media-overlay"
-    private val CSS_HANDLE = "/" + Injectable.Style.rawValue + "/(.*)"
-    private val JS_HANDLE = "/" + Injectable.Script.rawValue + "/(.*)"
-    private val FONT_HANDLE = "/" + Injectable.Font.rawValue + "/(.*)"
+    private val CSS_HANDLE = "/"+ Injectable.Style.rawValue +"/(.*)"
+    private val HTML_HANDLE = "/"+ Injectable.Html.rawValue +"/(.*)"
+    private val JS_HANDLE = "/"+ Injectable.Script.rawValue +"/(.*)"
+    private val FONT_HANDLE = "/"+ Injectable.Font.rawValue +"/(.*)"
     private val ASSETS_HANDLE = "/assets/(.*)"
     private var containsMediaOverlay = false
 
@@ -61,6 +62,7 @@ abstract class AbstractServer(
         assets.add(href = "readium-css", path = "readium/readium-css")
         assets.add(href = "scripts", path = "readium/scripts")
         assets.add(href = "fonts", path = "readium/fonts")
+        assets.add(href = "html", path = "readium/html")
     }
 
     private fun addResource(
@@ -130,7 +132,9 @@ abstract class AbstractServer(
         setRoute(ASSETS_HANDLE, AssetHandler::class.java, assets)
         setRoute(JS_HANDLE, ResourceHandler::class.java, resources)
         setRoute(CSS_HANDLE, ResourceHandler::class.java, resources)
-        setRoute(FONT_HANDLE, FileHandler::class.java, fonts)
+        setRoute(HTML_HANDLE, ResourceHandler::class.java, resources)
+
+      setRoute(FONT_HANDLE, FileHandler::class.java, fonts)
 
         return baseUrl
     }

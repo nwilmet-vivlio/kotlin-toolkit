@@ -12,6 +12,8 @@ package org.readium.r2.lcp.license.model
 import java.net.URL
 import java.nio.charset.Charset
 import java.util.*
+import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import org.readium.r2.lcp.LcpException
 import org.readium.r2.lcp.license.model.components.Link
@@ -36,6 +38,7 @@ class LicenseDocument(val data: ByteArray) {
     val rights: Rights
     val signature: Signature
     val json: JSONObject
+    val jsonSource: String
 
     enum class Rel(val rawValue: String) {
         hint("hint"),
@@ -51,7 +54,8 @@ class LicenseDocument(val data: ByteArray) {
 
     init {
         try {
-            json = JSONObject(data.toString(Charset.defaultCharset()))
+            jsonSource = data.toString(Charset.defaultCharset())
+            json = JSONObject(jsonSource)
         } catch (e: Exception) {
             throw LcpException.Parsing.MalformedJSON
         }
@@ -61,7 +65,7 @@ class LicenseDocument(val data: ByteArray) {
         issued = json.optNullableString("issued")?.iso8601ToDate() ?: throw LcpException.Parsing.LicenseDocument
         encryption = json.optJSONObject("encryption")?.let { Encryption(it) } ?: throw LcpException.Parsing.LicenseDocument
         signature = json.optJSONObject("signature")?.let { Signature(it) } ?: throw LcpException.Parsing.LicenseDocument
-        links = json.optJSONArray("links")?.let { Links(it) } ?: throw LcpException.Parsing.LicenseDocument
+        links = if (json.has("links")) Links(try { json.getJSONArray("links") } catch(e: JSONException) { convertLinksObject(json.getJSONObject("links")) }) else throw LcpException.Parsing.LicenseDocument
         updated = json.optNullableString("updated")?.iso8601ToDate() ?: issued
         user = User(json.optJSONObject("user") ?: JSONObject())
         rights = Rights(json.optJSONObject("rights") ?: JSONObject())
@@ -69,6 +73,18 @@ class LicenseDocument(val data: ByteArray) {
         if (link(Rel.hint) == null || link(Rel.publication) == null) {
             throw LcpException.Parsing.LicenseDocument
         }
+    }
+
+    fun convertLinksObject(links: JSONObject): JSONArray {
+        val linksArray = JSONArray()
+        val keys = links.keys()
+        while (keys.hasNext()) {
+            val rel = keys.next()
+            val link = links.getJSONObject(rel)
+            link.put("rel", rel)
+            linksArray.put(link)
+        }
+        return linksArray
     }
 
     fun link(rel: Rel, type: MediaType? = null): Link? =

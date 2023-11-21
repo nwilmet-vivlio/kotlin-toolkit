@@ -24,7 +24,9 @@ import org.readium.r2.shared.publication.services.*
 import org.readium.r2.shared.util.http.HttpClient
 import org.readium.r2.shared.util.logging.WarningLogger
 import org.readium.r2.shared.util.mediatype.MediaType
+import org.readium.r2.shared.util.pdf.PdfDocument
 import org.readium.r2.shared.util.pdf.PdfDocumentFactory
+import org.readium.r2.shared.util.pdf.toLinks
 import org.readium.r2.shared.util.use
 import org.readium.r2.streamer.PublicationParser
 import org.readium.r2.streamer.container.ContainerError
@@ -103,6 +105,14 @@ class ReadiumWebPubParser(
             }
         }
 
+        // Now we can compute the table of content for the PDF
+        pdfFactory?.let { factory ->
+            // here assume that there is only one pdf in the reading order
+            manifest.readingOrder.forEach {
+                val doc:PdfDocument = factory.open(fetcher.get(it), password = null)
+                manifest.tableOfContents = doc.outline.toLinks(it.href)
+            }
+        }
         return Publication.Builder(manifest, fetcher, servicesBuilder)
     }
 

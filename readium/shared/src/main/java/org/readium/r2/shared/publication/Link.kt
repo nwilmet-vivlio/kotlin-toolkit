@@ -51,6 +51,7 @@ val LinkHrefNormalizerIdentity: LinkHrefNormalizer = { it }
  * @param alternates Alternate resources for the linked resource.
  * @param children Resources that are children of the linked resource, in the context of a given
  *     collection role.
+ * @param position Page number of the linked resource
  */
 @Parcelize
 data class Link(
@@ -66,7 +67,8 @@ data class Link(
     val duration: Double? = null,
     val languages: List<String> = listOf(),
     val alternates: List<Link> = listOf(),
-    val children: List<Link> = listOf()
+    var children: List<Link> = listOf(),
+    var position: Int? = null
 ) : JSONable, Parcelable {
 
     /** Media type of the linked resource. */
@@ -123,6 +125,7 @@ data class Link(
         putIfNotEmpty("language", languages)
         putIfNotEmpty("alternate", alternates)
         putIfNotEmpty("children", children)
+        put("position", position)
     }
 
     /**
@@ -163,7 +166,8 @@ data class Link(
                 duration = json.optPositiveDouble("duration"),
                 languages = json.optStringsFromArrayOrSingle("language"),
                 alternates = fromJSONArray(json.optJSONArray("alternate"), normalizeHref),
-                children = fromJSONArray(json.optJSONArray("children"), normalizeHref)
+                children = fromJSONArray(json.optJSONArray("children"), normalizeHref),
+                position = json.optPositiveInt("position"),
             )
         }
 

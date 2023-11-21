@@ -7,6 +7,7 @@
 package org.readium.r2.navigator.pdf
 
 import android.graphics.PointF
+import android.graphics.RectF
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View

@@ -18,6 +18,7 @@ import kotlin.reflect.KClass
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.parcelize.Parcelize
 import org.json.JSONObject
 import org.readium.r2.shared.*
@@ -119,7 +120,7 @@ class Publication(
      * Returns the RWPM JSON representation for this [Publication]'s manifest, as a string.
      */
     val jsonManifest: String
-        get() = _manifest.toJSON().toString().replace("\\/", "/")
+        get() = _manifest.overrideNumberOfPagesAndTocPositions(runBlocking { positionsByReadingOrder() }).toJSON().toString().replace("\\/", "/")
 
     /**
      * The URL where this publication is served, computed from the [Link] with `self` relation.

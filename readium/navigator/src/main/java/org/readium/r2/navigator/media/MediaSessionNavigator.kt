@@ -6,6 +6,8 @@
 
 package org.readium.r2.navigator.media
 
+import android.graphics.Bitmap
+import android.media.MediaMetadata
 import android.media.session.PlaybackState
 import android.os.Bundle
 import android.support.v4.media.MediaMetadataCompat
@@ -49,6 +51,8 @@ class MediaSessionNavigator(
     override val publication: Publication,
     val publicationId: PublicationId,
     val controller: MediaControllerCompat,
+    val publicationMetadata: Bundle? = null,
+    val publicationCover: Bitmap? = null,
     var listener: Listener? = null
 ) : MediaNavigator, CoroutineScope by MainScope() {
 
@@ -231,7 +235,8 @@ class MediaSessionNavigator(
                 Timber.e("Can't find resource index in publication for media ID `${metadata.id}`.")
             }
 
-            val duration = index?.let { durations[index] }
+            val metadataDuration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
+            val duration = if (metadataDuration > 0L) Duration.milliseconds(metadataDuration) else index?.let { durations[index] }
 
             MediaPlayback(
                 state = state.toPlaybackState(),

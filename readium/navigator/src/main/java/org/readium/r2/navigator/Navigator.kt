@@ -159,6 +159,22 @@ interface VisualNavigator : Navigator {
          */
         fun onTap(point: PointF): Boolean = false
 
+      /**
+       * Called when the user pinch the content to scale
+       *
+       * Can be used to move the zoom level bar
+       *
+       * The zoomLevel is relative to the navigator's view.
+       */
+      fun onScale(zoomLevel: Float): Boolean = false
+
+      fun onSelection(selection: Selection): Boolean = false
+
+       /**
+       * Called when user pinches on EPUB Reflowable view
+       */
+      fun fontSize(fontSize: Int): Boolean = false
+
         /**
          * Called when the user starts dragging the content, but nothing handled the event
          * internally.
